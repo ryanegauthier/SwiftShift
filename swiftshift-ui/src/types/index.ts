@@ -58,3 +58,12 @@ export interface AvailabilityEvent {
   preference: AvailabilityPreference;
   notes?: string;
 }
+
+export type UserRole = 'admin' | 'tutor';
+
+export interface AuthUser {
+  id: number;
+  name: string;
+  email: string;
+  role: UserRole;
+}
