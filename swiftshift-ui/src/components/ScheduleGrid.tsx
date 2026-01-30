@@ -136,7 +136,7 @@ export const ScheduleGrid = () => {
   };
 
   const handleDragStart = (
-    event: React.DragEvent<HTMLDivElement>,
+    event: React.DragEvent<HTMLElement>,
     payload: { user_id: number; start_time: string; end_time: string }
   ) => {
     event.dataTransfer.setData('text/plain', JSON.stringify(payload));
