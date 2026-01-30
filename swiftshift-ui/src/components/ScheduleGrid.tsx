@@ -64,13 +64,13 @@ export const ScheduleGrid = () => {
   const { data: positions } = usePositions();
   const { events: availabilityEvents } = useAvailabilityEvents();
   const { requests: timeOffRequests } = useTimeOffRequests();
-  const { user } = useAuth();
+  const { user: authUser } = useAuth();
 
   const safeShifts = shifts ?? [];
   const allShifts = [...safeShifts, ...draftShifts];
-  const currentUserId = user?.role === 'tutor' ? user.id : undefined;
+  const currentUserId = authUser?.role === 'tutor' ? authUser.id : undefined;
   const ignoreLocationFilterForTutor =
-    user?.role === 'tutor' && scheduleScope === 'user';
+    authUser?.role === 'tutor' && scheduleScope === 'user';
   const filteredShifts =
     ignoreLocationFilterForTutor || selectedLocationId === 'all'
       ? allShifts
@@ -91,7 +91,7 @@ export const ScheduleGrid = () => {
   const selectedDayShifts = shiftsByDay[selectedDayIndex]?.dayShifts ?? [];
 
   useEffect(() => {
-    if (!user || user.role !== 'tutor' || scheduleScope !== 'location') {
+    if (!authUser || authUser.role !== 'tutor' || scheduleScope !== 'location') {
       return;
     }
 
@@ -107,17 +107,17 @@ export const ScheduleGrid = () => {
     const dayKey = format(selectedDay, 'yyyy-MM-dd');
     const userShift = allShifts.find(
       shift =>
-        shift.user_id === user.id &&
+        shift.user_id === authUser.id &&
         format(new Date(shift.start_time), 'yyyy-MM-dd') === dayKey
     );
     const fallbackLocationId =
-      users?.find(u => u.id === user.id)?.locations[0] ?? locations?.[0]?.id;
+      users?.find(u => u.id === authUser.id)?.locations[0] ?? locations?.[0]?.id;
     const nextLocationId = userShift?.location_id ?? fallbackLocationId;
 
     if (nextLocationId && String(nextLocationId) !== selectedLocationId) {
       setSelectedLocationId(String(nextLocationId));
     }
-  }, [user, scheduleScope, selectedDay, allShifts, users, locations, selectedLocationId, shiftsLoading]);
+  }, [authUser, scheduleScope, selectedDay, allShifts, users, locations, selectedLocationId, shiftsLoading]);
 
   const openHour = 14;
   const closeHour = selectedDay.getDay() === 5 ? 18 : 19;
@@ -528,7 +528,7 @@ export const ScheduleGrid = () => {
             >
               User schedule
             </button>
-            {(user?.role !== 'tutor' || view !== 'week') && (
+            {(authUser?.role !== 'tutor' || view !== 'week') && (
               <button
                 className={`px-3 py-1.5 text-sm font-medium rounded-md ${scheduleScope === 'location' ? 'bg-gray-900 text-white' : 'text-gray-600'}`}
                 onClick={() => setScheduleScope('location')}
@@ -542,7 +542,7 @@ export const ScheduleGrid = () => {
               className="rounded-lg border bg-white px-3 py-2 text-sm text-gray-700"
               value={selectedLocationId}
               onChange={event => setSelectedLocationId(event.target.value)}
-              disabled={user?.role === 'tutor'}
+              disabled={authUser?.role === 'tutor'}
             >
               <option value="all">All locations</option>
               {(locations ?? []).map(location => (
@@ -698,11 +698,11 @@ export const ScheduleGrid = () => {
           ))}
           </div>
 
-          {(user?.role !== 'tutor' || user) && (
+          {(authUser?.role !== 'tutor' || authUser) && (
             <div className="rounded-lg border bg-white p-4 shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900">Availability Calendar</h3>
               <p className="mt-1 text-sm text-gray-500">
-                {user?.role === 'tutor'
+                {authUser?.role === 'tutor'
                   ? 'Your saved availability for the week.'
                   : 'Drag a tutor from their available day into the schedule above.'}
               </p>
@@ -721,7 +721,7 @@ export const ScheduleGrid = () => {
                   ))}
 
                   {(users ?? [])
-                    .filter(listUser => user?.role !== 'tutor' || listUser.id === user.id)
+                    .filter(listUser => authUser?.role !== 'tutor' || listUser.id === authUser.id)
                     .map(listUser => (
                     <div key={listUser.id} className="contents">
                       <div className="sticky left-0 z-10 bg-white border-b border-r px-4 py-3 text-sm font-medium text-gray-900">
@@ -745,9 +745,9 @@ export const ScheduleGrid = () => {
                             {dayAvailability.map((availability, index) => (
                               <div
                                 key={`${listUser.id}-${dayOfWeek}-${index}`}
-                                draggable={user?.role !== 'tutor'}
+                                draggable={authUser?.role !== 'tutor'}
                                 onDragStart={
-                                  user?.role !== 'tutor'
+                                  authUser?.role !== 'tutor'
                                     ? event =>
                                         handleDragStart(event, {
                                           user_id: listUser.id,
@@ -757,7 +757,7 @@ export const ScheduleGrid = () => {
                                     : undefined
                                 }
                                 className={`mb-2 select-none rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 shadow-sm ${
-                                  user?.role !== 'tutor' ? 'cursor-grab hover:bg-gray-200' : 'cursor-default opacity-80'
+                                  authUser?.role !== 'tutor' ? 'cursor-grab hover:bg-gray-200' : 'cursor-default opacity-80'
                                 }`}
                               >
                                 {availability.start_time} - {availability.end_time}
@@ -787,7 +787,7 @@ export const ScheduleGrid = () => {
                 {format(day, 'EEE MMM d')}
               </button>
             ))}
-            {user?.role !== 'tutor' && (
+            {authUser?.role !== 'tutor' && (
               <button
                 className="ml-auto rounded-md border px-3 py-1.5 text-sm font-medium text-gray-700"
                 onClick={() => openQuickAdd()}
@@ -802,7 +802,7 @@ export const ScheduleGrid = () => {
             onDragOver={event => event.preventDefault()}
             onDrop={event => handleDropOnDay(event, selectedDay)}
             onContextMenu={event => {
-              if (user?.role === 'tutor') {
+              if (authUser?.role === 'tutor') {
                 return;
               }
               event.preventDefault();
@@ -842,22 +842,22 @@ export const ScheduleGrid = () => {
                 </div>
               )}
 
-              {tutorsForDay.map((user, rowIndex) => {
-                const userShifts = selectedDayShifts.filter(shift => shift.user_id === user.id);
+              {tutorsForDay.map((tutor, rowIndex) => {
+                const userShifts = selectedDayShifts.filter(shift => shift.user_id === tutor.id);
                 const mergedShifts = buildMergedShifts(userShifts);
                 const gridRow = rowIndex + 2;
 
                 return (
-                  <div key={user.id} className="contents">
+                  <div key={tutor.id} className="contents">
                     <div
                       className="sticky left-0 z-10 bg-white border-b border-r px-4 py-3 text-sm font-medium text-gray-900"
                       style={{ gridRow }}
                     >
-                      {user.first_name} {user.last_name}
+                      {tutor.first_name} {tutor.last_name}
                     </div>
                     {slots.map(minutesFromMidnight => (
                       <div
-                        key={`${user.id}-${minutesFromMidnight}`}
+                        key={`${tutor.id}-${minutesFromMidnight}`}
                         className="border-b border-r px-1 py-3"
                         style={{ gridRow }}
                       />
@@ -884,7 +884,7 @@ export const ScheduleGrid = () => {
 
                       return (
                         <div
-                          key={`shift-${user.id}-${index}`}
+                          key={`shift-${tutor.id}-${index}`}
                           style={{
                             gridColumn: `${startIdx + 2} / ${endIdx + 2}`,
                             gridRow,
@@ -894,22 +894,14 @@ export const ScheduleGrid = () => {
                             className="relative mx-1 my-1 rounded-md px-2 py-2 text-xs font-medium text-white shadow"
                             style={{ backgroundColor: locationColor }}
                             onContextMenu={event => {
-                              if (user?.role === 'tutor' || !editableShiftId) {
+                              if (authUser?.role === 'tutor' || !editableShiftId) {
                                 return;
                               }
                               event.preventDefault();
-                              removeDraftShift(editableShiftId);
-                            }}
-                            onContextMenu={event => {
-                              if (user?.role === 'tutor' || !editableShiftId) {
-                                return;
-                              }
-                              event.preventDefault();
-                              confirmRemoveShift(editableShiftId);
                               confirmRemoveShift(editableShiftId);
                             }}
                           >
-                            {user?.role !== 'tutor' && editableShiftId && (
+                            {authUser?.role !== 'tutor' && editableShiftId && (
                               <>
                                 <div
                                   className="absolute left-0 top-0 h-full w-2 cursor-ew-resize rounded-l-md bg-white/20"
@@ -961,14 +953,14 @@ export const ScheduleGrid = () => {
               })}
             </div>
           </div>
-          {(user?.role !== 'tutor' || user) && (
+          {(authUser?.role !== 'tutor' || authUser) && (
             <div className="rounded-lg border bg-white p-4 shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900">
                 Availability for {format(selectedDay, 'EEE, MMM d')}
               </h3>
               <div className="mt-3 space-y-3">
                 {(users ?? [])
-                  .filter(listUser => user?.role !== 'tutor' || listUser.id === user.id)
+                  .filter(listUser => authUser?.role !== 'tutor' || listUser.id === authUser.id)
                   .map(listUser => {
                   const dayOfWeek = selectedDay.getDay() === 0 ? 7 : selectedDay.getDay();
                   const userAvailability = availabilityEvents.filter(
@@ -992,9 +984,9 @@ export const ScheduleGrid = () => {
                         <button
                           type="button"
                           key={`${listUser.id}-availability-${index}`}
-                          draggable={user?.role !== 'tutor'}
+                          draggable={authUser?.role !== 'tutor'}
                           onDragStart={
-                            user?.role !== 'tutor'
+                            authUser?.role !== 'tutor'
                               ? event =>
                                   handleDragStart(event, {
                                     user_id: listUser.id,
@@ -1004,11 +996,11 @@ export const ScheduleGrid = () => {
                               : undefined
                           }
                           onClick={
-                            user?.role !== 'tutor'
+                            authUser?.role !== 'tutor'
                               ? () => openQuickAdd(listUser.id, availability.start_time, availability.end_time)
                               : undefined
                           }
-                          className={`rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 ${user?.role !== 'tutor' ? 'hover:bg-gray-200' : 'cursor-default opacity-80'}`}
+                          className={`rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 ${authUser?.role !== 'tutor' ? 'hover:bg-gray-200' : 'cursor-default opacity-80'}`}
                         >
                           {availability.start_time} - {availability.end_time}
                         </button>
@@ -1017,7 +1009,7 @@ export const ScheduleGrid = () => {
                   );
                 })}
                 {(users ?? [])
-                  .filter(listUser => user?.role !== 'tutor' || listUser.id === user.id)
+                  .filter(listUser => authUser?.role !== 'tutor' || listUser.id === authUser.id)
                   .every(listUser => {
                   const dayOfWeek = selectedDay.getDay() === 0 ? 7 : selectedDay.getDay();
                   return availabilityEvents.every(
