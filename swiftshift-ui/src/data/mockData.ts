@@ -19,7 +19,7 @@ export const mockUsers: User[] = [
     id: 1,
     first_name: "Sarah",
     last_name: "Johnson",
-    email: "sarah@tutorcenter.com",
+    email: "sarah@swiftshift.com",
     phone_number: "555-0101",
     positions: [1, 2],
     locations: [1, 2]
@@ -28,7 +28,7 @@ export const mockUsers: User[] = [
     id: 2,
     first_name: "Mike",
     last_name: "Chen",
-    email: "mike@tutorcenter.com",
+    email: "mike@swiftshift.com",
     phone_number: "555-0102",
     positions: [3],
     locations: [1, 3]
@@ -37,7 +37,7 @@ export const mockUsers: User[] = [
     id: 3,
     first_name: "Emily",
     last_name: "Rodriguez",
-    email: "emily@tutorcenter.com",
+    email: "emily@swiftshift.com",
     phone_number: "555-0103",
     positions: [1],
     locations: [2, 3]
@@ -46,7 +46,7 @@ export const mockUsers: User[] = [
     id: 4,
     first_name: "James",
     last_name: "Williams",
-    email: "james@tutorcenter.com",
+    email: "james@swiftshift.com",
     phone_number: "555-0104",
     positions: [2, 4],
     locations: [1]
@@ -55,7 +55,7 @@ export const mockUsers: User[] = [
     id: 5,
     first_name: "Lisa",
     last_name: "Brown",
-    email: "lisa@tutorcenter.com",
+    email: "lisa@swiftshift.com",
     phone_number: "555-0105",
     positions: [3, 1],
     locations: [2, 3]
@@ -64,7 +64,7 @@ export const mockUsers: User[] = [
     id: 6,
     first_name: "David",
     last_name: "Martinez",
-    email: "david@tutorcenter.com",
+    email: "david@swiftshift.com",
     phone_number: "555-0106",
     positions: [4],
     locations: [1, 2, 3]
@@ -73,7 +73,7 @@ export const mockUsers: User[] = [
     id: 7,
     first_name: "Amanda",
     last_name: "Taylor",
-    email: "amanda@tutorcenter.com",
+    email: "amanda@swiftshift.com",
     phone_number: "555-0107",
     positions: [2],
     locations: [3]
@@ -82,7 +82,7 @@ export const mockUsers: User[] = [
     id: 8,
     first_name: "Chris",
     last_name: "Anderson",
-    email: "chris@tutorcenter.com",
+    email: "chris@swiftshift.com",
     phone_number: "555-0108",
     positions: [1, 3],
     locations: [1, 2]
@@ -91,7 +91,7 @@ export const mockUsers: User[] = [
     id: 9,
     first_name: "Jessica",
     last_name: "Lee",
-    email: "jessica@tutorcenter.com",
+    email: "jessica@swiftshift.com",
     phone_number: "555-0109",
     positions: [5],
     locations: [1, 2, 3]
@@ -100,7 +100,7 @@ export const mockUsers: User[] = [
     id: 10,
     first_name: "Ryan",
     last_name: "Harris",
-    email: "ryan@tutorcenter.com",
+    email: "ryan@swiftshift.com",
     phone_number: "555-0110",
     positions: [3, 4],
     locations: [2]

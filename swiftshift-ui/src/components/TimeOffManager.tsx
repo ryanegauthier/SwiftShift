@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { TimePickerPopover } from './TimePickerPopover';
 import { useUsers } from '../hooks/useScheduleData';
 import { useTimeOffRequests } from '../hooks/useTimeOffRequests';
-import type { TimeOffRequest, TimeOffType } from '../types';
+import { useAuth } from '../hooks/useAuth';
+import type { TimeOffRequest, TimeOffType, UserRole } from '../types';
 
 const timeOffTypes: Array<{ value: TimeOffType; label: string }> = [
   { value: 'unpaid', label: 'Unpaid' },
@@ -12,8 +13,8 @@ const timeOffTypes: Array<{ value: TimeOffType; label: string }> = [
   { value: 'holiday', label: 'Holiday' },
 ];
 
-const defaultFormState = {
-  user_id: '',
+const getDefaultFormState = (userId?: number) => ({
+  user_id: userId ? String(userId) : '',
   type: 'unpaid' as TimeOffType,
   start_date: '',
   end_date: '',
@@ -21,18 +22,29 @@ const defaultFormState = {
   start_time: '09:00',
   end_time: '17:00',
   notes: '',
+});
+
+type TimeOffManagerProps = {
+  role: UserRole;
 };
 
-export const TimeOffManager = () => {
+export const TimeOffManager = ({ role }: TimeOffManagerProps) => {
+  const { user } = useAuth();
   const { data: users } = useUsers();
   const { requests, addRequest, updateRequest, deleteRequest } = useTimeOffRequests();
-  const [formState, setFormState] = useState(defaultFormState);
+  const [formState, setFormState] = useState(() => getDefaultFormState(user?.role === 'tutor' ? user.id : undefined));
   const [editingId, setEditingId] = useState<number | null>(null);
 
   const resetForm = () => {
-    setFormState(defaultFormState);
+    setFormState(getDefaultFormState(user?.role === 'tutor' ? user.id : undefined));
     setEditingId(null);
   };
+
+  useEffect(() => {
+    if (user?.role === 'tutor' && !editingId) {
+      setFormState(prev => ({ ...prev, user_id: String(user.id) }));
+    }
+  }, [user, editingId]);
 
   const handleTimeChange = (field: 'start_time' | 'end_time', value: string) => {
     setFormState(prev => ({
@@ -124,6 +136,7 @@ export const TimeOffManager = () => {
               className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
               value={formState.user_id}
               onChange={event => setFormState(prev => ({ ...prev, user_id: event.target.value }))}
+              disabled={user?.role === 'tutor'}
               required
             >
               <option value="">Select tutor</option>
@@ -223,11 +236,13 @@ export const TimeOffManager = () => {
 
       <div className="rounded-lg border bg-white p-4 shadow-sm">
         <h3 className="text-lg font-semibold text-gray-900">Time Off Requests</h3>
-        {requests.length === 0 ? (
+        {requests.filter(request => role === 'admin' || request.user_id === user?.id).length === 0 ? (
           <p className="mt-3 text-sm text-gray-500">No requests submitted yet.</p>
         ) : (
           <div className="mt-4 space-y-3">
-            {requests.map(request => {
+            {requests
+              .filter(request => role === 'admin' || request.user_id === user?.id)
+              .map(request => {
               const tutor = users?.find(user => user.id === request.user_id);
               const typeLabel = timeOffTypes.find(type => type.value === request.type)?.label ?? request.type;
 
@@ -265,7 +280,7 @@ export const TimeOffManager = () => {
                       >
                         {request.status}
                       </span>
-                      {request.status === 'pending' && (
+                      {request.status === 'pending' && role === 'admin' && (
                         <>
                           <button
                             className="text-green-600 hover:text-green-700"

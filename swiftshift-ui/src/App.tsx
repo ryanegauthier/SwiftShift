@@ -3,19 +3,41 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ScheduleGrid } from './components/ScheduleGrid';
 import { TimeOffManager } from './components/TimeOffManager';
 import { AvailabilityManager } from './components/AvailabilityManager';
+import { Login } from './components/Login';
+import { useAuth } from './hooks/useAuth';
 
 const queryClient = new QueryClient();
 
 function App() {
   const [activeTab, setActiveTab] = useState<'schedule' | 'timeoff' | 'availability'>('schedule');
+  const { user, login, logout } = useAuth();
+
+  if (!user) {
+    return <Login onLogin={login} />;
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen bg-gray-50">
         <header className="bg-white shadow-sm">
           <div className="max-w-7xl mx-auto px-4 py-4">
-            <h1 className="text-3xl font-bold text-gray-900">SwiftShift</h1>
-            <p className="text-gray-600">Better scheduling for tutoring centers</p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">SwiftShift</h1>
+                <p className="text-gray-600">Better scheduling for tutoring centers</p>
+              </div>
+              <div className="flex items-center gap-3 text-sm text-gray-600">
+                <span>
+                  Signed in as <span className="font-medium text-gray-900">{user.name}</span>
+                </span>
+                <button
+                  className="rounded-md border px-3 py-1.5 text-sm font-medium text-gray-700"
+                  onClick={logout}
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
           </div>
         </header>
         <main className="max-w-7xl mx-auto px-4 py-8">
@@ -40,7 +62,7 @@ function App() {
             </button>
           </div>
           {activeTab === 'schedule' && <ScheduleGrid />}
-          {activeTab === 'timeoff' && <TimeOffManager />}
+          {activeTab === 'timeoff' && <TimeOffManager role={user.role} />}
           {activeTab === 'availability' && <AvailabilityManager />}
         </main>
       </div>

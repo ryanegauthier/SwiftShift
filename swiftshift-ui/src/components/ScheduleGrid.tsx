@@ -1,21 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useShifts, useUsers, useLocations, usePositions } from '../hooks/useScheduleData';
 import { useAvailabilityEvents } from '../hooks/useAvailabilityEvents';
 import { useTimeOffRequests } from '../hooks/useTimeOffRequests';
+import { useAuth } from '../hooks/useAuth';
 import { format, startOfWeek, endOfWeek, addDays } from 'date-fns';
 import type { Shift } from '../types';
 
-const tutorColors = [
-  '#0ea5e9',
-  '#10b981',
-  '#8b5cf6',
-  '#f59e0b',
-  '#ef4444',
-  '#14b8a6',
-  '#6366f1',
+const locationColors = [
+  '#2563eb',
+  '#16a34a',
   '#f97316',
-  '#22c55e',
-  '#ec4899',
+  '#0ea5e9',
+  '#a855f7',
 ];
 
 export const ScheduleGrid = () => {
@@ -26,12 +22,14 @@ export const ScheduleGrid = () => {
   const defaultDayIndex = isWeekday ? Math.max(0, Math.min(4, today.getDay() - 1)) : 0;
 
   const [view, setView] = useState<'week' | 'day'>('day');
+  const [scheduleScope, setScheduleScope] = useState<'user' | 'location'>('user');
   const [selectedDayIndex, setSelectedDayIndex] = useState(defaultDayIndex);
   const [draftShifts, setDraftShifts] = useState<Shift[]>([]);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddUserId, setQuickAddUserId] = useState<string>('');
   const [quickAddStart, setQuickAddStart] = useState('14:00');
   const [quickAddEnd, setQuickAddEnd] = useState('16:00');
+  const [selectedLocationId, setSelectedLocationId] = useState('all');
   const weekStart = format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd');
   const weekEnd = format(endOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd');
 
@@ -41,6 +39,7 @@ export const ScheduleGrid = () => {
   const { data: positions } = usePositions();
   const { events: availabilityEvents } = useAvailabilityEvents();
   const { requests: timeOffRequests } = useTimeOffRequests();
+  const { user } = useAuth();
 
   if (shiftsLoading) {
     return (
@@ -60,9 +59,20 @@ export const ScheduleGrid = () => {
 
   const safeShifts = shifts ?? [];
   const allShifts = [...safeShifts, ...draftShifts];
+  const currentUserId = user?.role === 'tutor' ? user.id : undefined;
+  const ignoreLocationFilterForTutor =
+    user?.role === 'tutor' && scheduleScope === 'user';
+  const filteredShifts =
+    ignoreLocationFilterForTutor || selectedLocationId === 'all'
+      ? allShifts
+      : allShifts.filter(shift => String(shift.location_id) === selectedLocationId);
+  const scopedShifts =
+    scheduleScope === 'user' && currentUserId
+      ? filteredShifts.filter(shift => shift.user_id === currentUserId)
+      : filteredShifts;
   const shiftsByDay = days.map(day => {
     const dayKey = format(day, 'yyyy-MM-dd');
-    const dayShifts = allShifts
+    const dayShifts = scopedShifts
       .filter(shift => format(new Date(shift.start_time), 'yyyy-MM-dd') === dayKey)
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
     return { day, dayShifts };
@@ -70,6 +80,31 @@ export const ScheduleGrid = () => {
 
   const selectedDay = days[selectedDayIndex];
   const selectedDayShifts = shiftsByDay[selectedDayIndex]?.dayShifts ?? [];
+
+  useEffect(() => {
+    if (!user || user.role !== 'tutor' || scheduleScope !== 'location') {
+      return;
+    }
+
+    if (view === 'week') {
+      setScheduleScope('user');
+      return;
+    }
+
+    const dayKey = format(selectedDay, 'yyyy-MM-dd');
+    const userShift = allShifts.find(
+      shift =>
+        shift.user_id === user.id &&
+        format(new Date(shift.start_time), 'yyyy-MM-dd') === dayKey
+    );
+    const fallbackLocationId =
+      users?.find(u => u.id === user.id)?.locations[0] ?? locations?.[0]?.id;
+    const nextLocationId = userShift?.location_id ?? fallbackLocationId;
+
+    if (nextLocationId && String(nextLocationId) !== selectedLocationId) {
+      setSelectedLocationId(String(nextLocationId));
+    }
+  }, [user, scheduleScope, selectedDay, allShifts, users, locations, selectedLocationId]);
 
   const openHour = 14;
   const closeHour = selectedDay.getDay() === 5 ? 18 : 19;
@@ -202,11 +237,11 @@ export const ScheduleGrid = () => {
     closeQuickAdd();
   };
 
-  const getTutorColor = (userId?: number) => {
-    if (!userId) {
+  const getLocationColor = (locationId?: number) => {
+    if (!locationId) {
       return '#4b5563';
     }
-    return tutorColors[(userId - 1) % tutorColors.length];
+    return locationColors[(locationId - 1) % locationColors.length];
   };
 
   const buildMergedShifts = (userShifts: typeof selectedDayShifts) => {
@@ -242,19 +277,52 @@ export const ScheduleGrid = () => {
     <div className="p-4">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <h2 className="text-2xl font-bold text-gray-900">Schedule</h2>
-        <div className="inline-flex rounded-lg border bg-white p-1">
-          <button
-            className={`px-3 py-1.5 text-sm font-medium rounded-md ${view === 'week' ? 'bg-gray-900 text-white' : 'text-gray-600'}`}
-            onClick={() => setView('week')}
-          >
-            Week
-          </button>
-          <button
-            className={`px-3 py-1.5 text-sm font-medium rounded-md ${view === 'day' ? 'bg-gray-900 text-white' : 'text-gray-600'}`}
-            onClick={() => setView('day')}
-          >
-            Day
-          </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="inline-flex rounded-lg border bg-white p-1">
+            <button
+              className={`px-3 py-1.5 text-sm font-medium rounded-md ${view === 'week' ? 'bg-gray-900 text-white' : 'text-gray-600'}`}
+              onClick={() => setView('week')}
+            >
+              Week
+            </button>
+            <button
+              className={`px-3 py-1.5 text-sm font-medium rounded-md ${view === 'day' ? 'bg-gray-900 text-white' : 'text-gray-600'}`}
+              onClick={() => setView('day')}
+            >
+              Day
+            </button>
+          </div>
+          <div className="inline-flex rounded-lg border bg-white p-1">
+            <button
+              className={`px-3 py-1.5 text-sm font-medium rounded-md ${scheduleScope === 'user' ? 'bg-gray-900 text-white' : 'text-gray-600'}`}
+              onClick={() => setScheduleScope('user')}
+            >
+              User schedule
+            </button>
+            {(user?.role !== 'tutor' || view !== 'week') && (
+              <button
+                className={`px-3 py-1.5 text-sm font-medium rounded-md ${scheduleScope === 'location' ? 'bg-gray-900 text-white' : 'text-gray-600'}`}
+                onClick={() => setScheduleScope('location')}
+              >
+                Location schedule
+              </button>
+            )}
+          </div>
+          {scheduleScope === 'location' && (
+            <select
+              className="rounded-lg border bg-white px-3 py-2 text-sm text-gray-700"
+              value={selectedLocationId}
+              onChange={event => setSelectedLocationId(event.target.value)}
+              disabled={user?.role === 'tutor'}
+            >
+              <option value="all">All locations</option>
+              {(locations ?? []).map(location => (
+                <option key={location.id} value={String(location.id)}>
+                  {location.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
@@ -278,114 +346,155 @@ export const ScheduleGrid = () => {
                 {dayShifts.length === 0 && (
                   <div className="text-sm text-gray-500">No shifts</div>
                 )}
-                {(users ?? [])
-                  .filter(user => dayShifts.some(shift => shift.user_id === user.id))
-                  .flatMap(user => {
-                    const userShifts = dayShifts.filter(shift => shift.user_id === user.id);
-                    const mergedShifts = buildMergedShifts(userShifts);
+                {scheduleScope === 'user' &&
+                  (users ?? [])
+                    .filter(user => dayShifts.some(shift => shift.user_id === user.id))
+                    .flatMap(user => {
+                      const userShifts = dayShifts.filter(shift => shift.user_id === user.id);
+                      const mergedShifts = buildMergedShifts(userShifts);
 
-                    return mergedShifts.map((mergedShift, index) => {
-                      const positionIds = new Set(mergedShift.shifts.map(s => s.position_id));
-                      const position = positions?.find(p => p.id === mergedShift.shifts[0]?.position_id);
-                      const location = locations?.find(l => l.id === mergedShift.shifts[0]?.location_id);
-                      const startTime = mergedShift.start;
-                      const endTime = mergedShift.end;
-                      const hasMultiplePositions = positionIds.size > 1;
-                      const tutorColor = getTutorColor(user.id);
+                      return mergedShifts.map((mergedShift, index) => {
+                        const positionIds = new Set(mergedShift.shifts.map(s => s.position_id));
+                        const position = positions?.find(p => p.id === mergedShift.shifts[0]?.position_id);
+                        const location = locations?.find(l => l.id === mergedShift.shifts[0]?.location_id);
+                        const startTime = mergedShift.start;
+                        const endTime = mergedShift.end;
+                        const hasMultiplePositions = positionIds.size > 1;
+                        const locationColor = getLocationColor(location?.id);
 
-                      return (
-                        <div
-                          key={`${user.id}-${index}`}
-                          className="border rounded-md p-3 shadow-sm"
-                          style={{ borderLeftWidth: '4px', borderLeftColor: tutorColor }}
-                        >
-                          <div className="text-sm font-semibold text-gray-900">
-                            {user.first_name} {user.last_name}
+                        return (
+                          <div
+                            key={`${user.id}-${index}`}
+                            className="border rounded-md p-3 shadow-sm"
+                            style={{ borderLeftWidth: '4px', borderLeftColor: locationColor }}
+                          >
+                            <div className="text-sm font-semibold text-gray-900">
+                              {user.first_name} {user.last_name}
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              {format(startTime, 'h:mm a')} - {format(endTime, 'h:mm a')}
+                              {mergedShift.shifts.length > 1 && (
+                                <span className="ml-1 text-[10px] text-gray-500">
+                                  ({mergedShift.shifts.length} sessions)
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {hasMultiplePositions ? 'Multiple positions' : position?.name}
+                            </div>
+                            <div className="text-xs text-gray-500">{location?.name}</div>
                           </div>
-                          <div className="text-xs text-gray-600">
-                            {format(startTime, 'h:mm a')} - {format(endTime, 'h:mm a')}
-                            {mergedShift.shifts.length > 1 && (
-                              <span className="ml-1 text-[10px] text-gray-500">
-                                ({mergedShift.shifts.length} sessions)
-                              </span>
-                            )}
+                        );
+                      });
+                    })}
+                {scheduleScope === 'location' &&
+                  (locations ?? [])
+                    .filter(location => dayShifts.some(shift => shift.location_id === location.id))
+                    .flatMap(location => {
+                      const locationShifts = dayShifts.filter(shift => shift.location_id === location.id);
+                      return locationShifts.map(shift => {
+                        const user = users?.find(u => u.id === shift.user_id);
+                        const position = positions?.find(p => p.id === shift.position_id);
+                        const startTime = new Date(shift.start_time);
+                        const endTime = new Date(shift.end_time);
+
+                        return (
+                          <div
+                            key={shift.id}
+                            className="border rounded-md p-3 shadow-sm"
+                            style={{ borderLeftWidth: '4px', borderLeftColor: getLocationColor(location.id) }}
+                          >
+                            <div className="text-sm font-semibold text-gray-900">{location.name}</div>
+                            <div className="text-xs text-gray-600">
+                              {format(startTime, 'h:mm a')} - {format(endTime, 'h:mm a')}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {user?.first_name} {user?.last_name}
+                            </div>
+                            <div className="text-xs text-gray-500">{position?.name}</div>
                           </div>
-                          <div className="text-xs text-gray-500">
-                            {hasMultiplePositions ? 'Multiple positions' : position?.name}
-                          </div>
-                          <div className="text-xs text-gray-500">{location?.name}</div>
-                        </div>
-                      );
-                    });
-                  })}
+                        );
+                      });
+                    })}
               </div>
             </div>
           ))}
           </div>
 
+          {(user?.role !== 'tutor' || user) && (
             <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900">Availability Calendar</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Drag a tutor from their available day into the schedule above.
-            </p>
-            <div className="mt-4 overflow-x-auto">
-              <div
-                className="grid min-w-[900px]"
-                style={{ gridTemplateColumns: `220px repeat(${days.length}, minmax(140px, 1fr))` }}
-              >
-                <div className="sticky left-0 z-10 bg-gray-50 border-b border-r px-4 py-2 text-sm font-semibold text-gray-700">
-                  Tutor
-                </div>
-                {days.map(day => (
-                  <div key={format(day, 'yyyy-MM-dd')} className="border-b px-2 py-2 text-xs text-gray-500 text-center bg-gray-50">
-                    {format(day, 'EEE MMM d')}
+              <h3 className="text-lg font-semibold text-gray-900">Availability Calendar</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                {user?.role === 'tutor'
+                  ? 'Your saved availability for the week.'
+                  : 'Drag a tutor from their available day into the schedule above.'}
+              </p>
+              <div className="mt-4 overflow-x-auto">
+                <div
+                  className="grid min-w-[900px]"
+                  style={{ gridTemplateColumns: `220px repeat(${days.length}, minmax(140px, 1fr))` }}
+                >
+                  <div className="sticky left-0 z-10 bg-gray-50 border-b border-r px-4 py-2 text-sm font-semibold text-gray-700">
+                    Tutor
                   </div>
-                ))}
-
-                {(users ?? []).map(user => (
-                  <div key={user.id} className="contents">
-                    <div className="sticky left-0 z-10 bg-white border-b border-r px-4 py-3 text-sm font-medium text-gray-900">
-                      {user.first_name} {user.last_name}
+                  {days.map(day => (
+                    <div key={format(day, 'yyyy-MM-dd')} className="border-b px-2 py-2 text-xs text-gray-500 text-center bg-gray-50">
+                      {format(day, 'EEE MMM d')}
                     </div>
-                    {days.map(day => {
-                      const dayOfWeek = day.getDay() === 0 ? 7 : day.getDay();
-                      const dayAvailability = availabilityEvents.filter(
-                        event =>
-                          event.user_id === user.id &&
-                          event.day_of_week === dayOfWeek &&
-                          event.preference === 'available' &&
-                          !hasApprovedTimeOff(user.id, day)
-                      );
+                  ))}
 
-                      return (
-                        <div key={`${user.id}-${format(day, 'yyyy-MM-dd')}`} className="border-b border-r px-2 py-3">
-                          {dayAvailability.length === 0 && (
-                            <div className="text-xs text-gray-300">—</div>
-                          )}
-                          {dayAvailability.map((availability, index) => (
-                            <div
-                              key={`${user.id}-${dayOfWeek}-${index}`}
-                              draggable
-                              onDragStart={event =>
-                                handleDragStart(event, {
-                                  user_id: user.id,
-                                  start_time: availability.start_time,
-                                  end_time: availability.end_time,
-                                })
-                              }
-                              className="mb-2 cursor-grab select-none rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-200"
-                            >
-                              {availability.start_time} - {availability.end_time}
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
+                  {(users ?? [])
+                    .filter(listUser => user?.role !== 'tutor' || listUser.id === user.id)
+                    .map(listUser => (
+                    <div key={listUser.id} className="contents">
+                      <div className="sticky left-0 z-10 bg-white border-b border-r px-4 py-3 text-sm font-medium text-gray-900">
+                        {listUser.first_name} {listUser.last_name}
+                      </div>
+                      {days.map(day => {
+                        const dayOfWeek = day.getDay() === 0 ? 7 : day.getDay();
+                        const dayAvailability = availabilityEvents.filter(
+                          event =>
+                            event.user_id === listUser.id &&
+                            event.day_of_week === dayOfWeek &&
+                            event.preference === 'available' &&
+                            !hasApprovedTimeOff(listUser.id, day)
+                        );
+
+                        return (
+                          <div key={`${listUser.id}-${format(day, 'yyyy-MM-dd')}`} className="border-b border-r px-2 py-3">
+                            {dayAvailability.length === 0 && (
+                              <div className="text-xs text-gray-300">—</div>
+                            )}
+                            {dayAvailability.map((availability, index) => (
+                              <div
+                                key={`${listUser.id}-${dayOfWeek}-${index}`}
+                                draggable={user?.role !== 'tutor'}
+                                onDragStart={
+                                  user?.role !== 'tutor'
+                                    ? event =>
+                                        handleDragStart(event, {
+                                          user_id: listUser.id,
+                                          start_time: availability.start_time,
+                                          end_time: availability.end_time,
+                                        })
+                                    : undefined
+                                }
+                                className={`mb-2 select-none rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 shadow-sm ${
+                                  user?.role !== 'tutor' ? 'cursor-grab hover:bg-gray-200' : 'cursor-default opacity-80'
+                                }`}
+                              >
+                                {availability.start_time} - {availability.end_time}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -401,80 +510,96 @@ export const ScheduleGrid = () => {
                 {format(day, 'EEE MMM d')}
               </button>
             ))}
-            <button
-              className="ml-auto rounded-md border px-3 py-1.5 text-sm font-medium text-gray-700"
-              onClick={() => openQuickAdd()}
-            >
-              Quick add
-            </button>
+            {user?.role !== 'tutor' && (
+              <button
+                className="ml-auto rounded-md border px-3 py-1.5 text-sm font-medium text-gray-700"
+                onClick={() => openQuickAdd()}
+              >
+                Quick add
+              </button>
+            )}
           </div>
 
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Availability for {format(selectedDay, 'EEE, MMM d')}
-            </h3>
-            <div className="mt-3 space-y-3">
-              {(users ?? []).map(user => {
-                const dayOfWeek = selectedDay.getDay() === 0 ? 7 : selectedDay.getDay();
-                const userAvailability = availabilityEvents.filter(
-                  event =>
-                    event.user_id === user.id &&
-                    event.day_of_week === dayOfWeek &&
-                    event.preference === 'available' &&
-                    !hasApprovedTimeOff(user.id, selectedDay)
-                );
+          {(user?.role !== 'tutor' || user) && (
+            <div className="rounded-lg border bg-white p-4 shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Availability for {format(selectedDay, 'EEE, MMM d')}
+              </h3>
+              <div className="mt-3 space-y-3">
+                {(users ?? [])
+                  .filter(listUser => user?.role !== 'tutor' || listUser.id === user.id)
+                  .map(listUser => {
+                  const dayOfWeek = selectedDay.getDay() === 0 ? 7 : selectedDay.getDay();
+                  const userAvailability = availabilityEvents.filter(
+                    event =>
+                      event.user_id === listUser.id &&
+                      event.day_of_week === dayOfWeek &&
+                      event.preference === 'available' &&
+                      !hasApprovedTimeOff(listUser.id, selectedDay)
+                  );
 
-                if (userAvailability.length === 0) {
-                  return null;
-                }
+                  if (userAvailability.length === 0) {
+                    return null;
+                  }
 
-                return (
-                  <div key={`availability-${user.id}`} className="flex flex-wrap items-center gap-2 text-sm">
-                    <span className="font-medium text-gray-900">
-                      {user.first_name} {user.last_name}
-                    </span>
-                    {userAvailability.map((availability, index) => (
-                      <button
-                        type="button"
-                        key={`${user.id}-availability-${index}`}
-                        draggable
-                        onDragStart={event =>
-                          handleDragStart(event, {
-                            user_id: user.id,
-                            start_time: availability.start_time,
-                            end_time: availability.end_time,
-                          })
-                        }
-                        onClick={() =>
-                          openQuickAdd(user.id, availability.start_time, availability.end_time)
-                        }
-                        className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200"
-                      >
-                        {availability.start_time} - {availability.end_time}
-                      </button>
-                    ))}
-                  </div>
-                );
-              })}
-              {(users ?? []).every(user => {
-                const dayOfWeek = selectedDay.getDay() === 0 ? 7 : selectedDay.getDay();
-                return availabilityEvents.every(
-                  event =>
-                    event.user_id !== user.id ||
-                    event.day_of_week !== dayOfWeek ||
-                    event.preference !== 'available'
-                );
-              }) && (
-                <p className="text-sm text-gray-500">No availability saved for this day.</p>
-              )}
+                  return (
+                    <div key={`availability-${listUser.id}`} className="flex flex-wrap items-center gap-2 text-sm">
+                      <span className="font-medium text-gray-900">
+                        {listUser.first_name} {listUser.last_name}
+                      </span>
+                      {userAvailability.map((availability, index) => (
+                        <button
+                          type="button"
+                          key={`${listUser.id}-availability-${index}`}
+                          draggable={user?.role !== 'tutor'}
+                          onDragStart={
+                            user?.role !== 'tutor'
+                              ? event =>
+                                  handleDragStart(event, {
+                                    user_id: listUser.id,
+                                    start_time: availability.start_time,
+                                    end_time: availability.end_time,
+                                  })
+                              : undefined
+                          }
+                          onClick={
+                            user?.role !== 'tutor'
+                              ? () => openQuickAdd(listUser.id, availability.start_time, availability.end_time)
+                              : undefined
+                          }
+                          className={`rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 ${user?.role !== 'tutor' ? 'hover:bg-gray-200' : 'cursor-default opacity-80'}`}
+                        >
+                          {availability.start_time} - {availability.end_time}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
+                {(users ?? [])
+                  .filter(listUser => user?.role !== 'tutor' || listUser.id === user.id)
+                  .every(listUser => {
+                  const dayOfWeek = selectedDay.getDay() === 0 ? 7 : selectedDay.getDay();
+                  return availabilityEvents.every(
+                    event =>
+                      event.user_id !== listUser.id ||
+                      event.day_of_week !== dayOfWeek ||
+                      event.preference !== 'available'
+                  );
+                }) && (
+                  <p className="text-sm text-gray-500">No availability saved for this day.</p>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           <div
             className="overflow-x-auto border rounded-lg bg-white"
             onDragOver={event => event.preventDefault()}
             onDrop={event => handleDropOnDay(event, selectedDay)}
             onContextMenu={event => {
+              if (user?.role === 'tutor') {
+                return;
+              }
               event.preventDefault();
               openQuickAdd();
             }}
@@ -530,7 +655,7 @@ export const ScheduleGrid = () => {
                       const gridEnd = Math.min(endHour, closeHour);
                       const startIdx = gridStart - openHour;
                       const endIdx = gridEnd - openHour;
-                      const tutorColor = getTutorColor(user.id);
+                      const locationColor = getLocationColor(mergedShift.shifts[0]?.location_id);
 
                       if (endIdx <= startIdx) {
                         return null;
@@ -546,7 +671,7 @@ export const ScheduleGrid = () => {
                         >
                           <div
                             className="mx-1 my-1 rounded-md px-2 py-2 text-xs font-medium text-white shadow"
-                            style={{ backgroundColor: tutorColor }}
+                            style={{ backgroundColor: locationColor }}
                           >
                             {format(startTime, 'h:mm a')} - {format(endTime, 'h:mm a')}
                             {mergedShift.shifts.length > 1 && (
