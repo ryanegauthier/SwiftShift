@@ -820,7 +820,7 @@ export const ScheduleGrid = () => {
               <div className="sticky left-0 z-10 bg-gray-50 border-b border-r px-4 py-2 text-sm font-semibold text-gray-700">
                 Tutor
               </div>
-              {slots.map((minutesFromMidnight, idx) => {
+              {slots.map((minutesFromMidnight) => {
                 const hour = Math.floor(minutesFromMidnight / 60);
                 const minutes = minutesFromMidnight % 60;
                 const showLabel = minutes === 0;
@@ -1048,7 +1048,7 @@ export const ScheduleGrid = () => {
                       ))}
                     </select>
                   </label>
-                  {user?.role !== 'tutor' && (
+                  {authUser?.role !== 'tutor' && (
                     <label className="text-sm font-medium text-gray-600">
                       Location
                       <select
@@ -1117,7 +1117,7 @@ export const ScheduleGrid = () => {
                       className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
                       value={dropLocationId}
                       onChange={event => setDropLocationId(event.target.value)}
-                      disabled={user?.role === 'tutor'}
+                      disabled={authUser?.role === 'tutor'}
                     >
                       <option value="auto">Auto (tutor default)</option>
                       {(locations ?? []).map(location => (
