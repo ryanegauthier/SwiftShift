@@ -41,22 +41,6 @@ export const ScheduleGrid = () => {
   const { requests: timeOffRequests } = useTimeOffRequests();
   const { user } = useAuth();
 
-  if (shiftsLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading schedule...</div>
-      </div>
-    );
-  }
-
-  if (!shifts || shifts.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">No shifts scheduled this week</div>
-      </div>
-    );
-  }
-
   const safeShifts = shifts ?? [];
   const allShifts = [...safeShifts, ...draftShifts];
   const currentUserId = user?.role === 'tutor' ? user.id : undefined;
@@ -86,6 +70,10 @@ export const ScheduleGrid = () => {
       return;
     }
 
+    if (shiftsLoading) {
+      return;
+    }
+
     if (view === 'week') {
       setScheduleScope('user');
       return;
@@ -104,7 +92,23 @@ export const ScheduleGrid = () => {
     if (nextLocationId && String(nextLocationId) !== selectedLocationId) {
       setSelectedLocationId(String(nextLocationId));
     }
-  }, [user, scheduleScope, selectedDay, allShifts, users, locations, selectedLocationId]);
+  }, [user, scheduleScope, selectedDay, allShifts, users, locations, selectedLocationId, shiftsLoading]);
+
+  if (shiftsLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">Loading schedule...</div>
+      </div>
+    );
+  }
+
+  if (!shifts || shifts.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">No shifts scheduled this week</div>
+      </div>
+    );
+  }
 
   const openHour = 14;
   const closeHour = selectedDay.getDay() === 5 ? 18 : 19;
