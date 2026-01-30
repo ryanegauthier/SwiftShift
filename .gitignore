@@ -1,0 +1,26 @@
+docs-master.json
+swiftshift.sh
+
+# Node / Vite
+node_modules/
+dist/
+dist-ssr/
+.vite/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Env files
+.env
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
